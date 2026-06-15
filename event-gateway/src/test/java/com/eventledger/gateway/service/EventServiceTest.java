@@ -6,6 +6,7 @@ import com.eventledger.gateway.domain.TransactionType;
 import com.eventledger.gateway.dto.EventRequest;
 import com.eventledger.gateway.dto.EventResponse;
 import com.eventledger.gateway.exception.AccountServiceUnavailableException;
+import com.eventledger.gateway.exception.EventConflictException;
 import com.eventledger.gateway.metrics.EventMetrics;
 import com.eventledger.gateway.repository.EventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,6 +72,29 @@ class EventServiceTest {
         EventService.SubmitResult second = eventService.submitEvent(request);
 
         assertThat(second.created()).isFalse();
+        assertThat(eventRepository.findAll()).hasSize(1);
+        verify(accountServiceClient).applyTransaction(eq("acct-123"), any());
+    }
+
+    @Test
+    void duplicateEventIdWithDifferentDetailsIsRejected() {
+        EventRequest request = sampleRequest("evt-dup-conflict");
+        eventService.submitEvent(request);
+
+        EventRequest conflicting = new EventRequest(
+                request.eventId(),
+                request.accountId(),
+                TransactionType.DEBIT,
+                request.amount(),
+                request.currency(),
+                request.eventTimestamp(),
+                null
+        );
+
+        assertThatThrownBy(() -> eventService.submitEvent(conflicting))
+                .isInstanceOf(EventConflictException.class)
+                .hasMessageContaining("eventId already exists with different event details");
+
         assertThat(eventRepository.findAll()).hasSize(1);
         verify(accountServiceClient).applyTransaction(eq("acct-123"), any());
     }

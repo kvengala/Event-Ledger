@@ -106,6 +106,29 @@ class EndToEndIntegrationTest {
     }
 
     @Test
+    void duplicateSubmissionWithDifferentDetailsReturnsConflict() {
+        submitEvent("evt-e2e-conflict", "acct-e2e-conflict", "CREDIT", "50.00", "2026-05-15T14:00:00Z", null);
+
+        ResponseEntity<Map> conflict = submitEvent(
+                "evt-e2e-conflict",
+                "acct-e2e-conflict",
+                "DEBIT",
+                "50.00",
+                "2026-05-15T14:00:00Z",
+                null
+        );
+
+        assertThat(conflict.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(conflict.getBody()).containsEntry("status", 409);
+
+        ResponseEntity<Map> balance = restTemplate.getForEntity(
+                accountServiceBaseUrl() + "/accounts/acct-e2e-conflict/balance",
+                Map.class
+        );
+        assertThat(balance.getBody()).containsEntry("balance", 50.0);
+    }
+
+    @Test
     void outOfOrderEventsProduceCorrectBalanceAndListing() {
         submitEvent("evt-e2e-later", "acct-e2e-3", "CREDIT", "100.00", "2026-05-15T16:00:00Z", null);
         submitEvent("evt-e2e-earlier", "acct-e2e-3", "CREDIT", "25.00", "2026-05-15T10:00:00Z", null);

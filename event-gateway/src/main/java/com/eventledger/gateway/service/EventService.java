@@ -5,6 +5,7 @@ import com.eventledger.gateway.domain.EventEntity;
 import com.eventledger.gateway.dto.AccountTransactionRequest;
 import com.eventledger.gateway.dto.EventRequest;
 import com.eventledger.gateway.dto.EventResponse;
+import com.eventledger.gateway.exception.EventConflictException;
 import com.eventledger.gateway.exception.EventNotFoundException;
 import com.eventledger.gateway.metrics.EventMetrics;
 import com.eventledger.gateway.repository.EventRepository;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -43,6 +45,7 @@ public class EventService {
     public SubmitResult submitEvent(EventRequest request) {
         var existing = eventRepository.findByEventId(request.eventId());
         if (existing.isPresent()) {
+            validateDuplicateMatches(existing.get(), request);
             eventMetrics.recordSubmission("POST /events", "duplicate");
             return new SubmitResult(toResponse(existing.get()), false);
         }
@@ -73,6 +76,7 @@ public class EventService {
         } catch (DataIntegrityViolationException ex) {
             EventEntity duplicate = eventRepository.findByEventId(request.eventId())
                     .orElseThrow(() -> ex);
+            validateDuplicateMatches(duplicate, request);
             eventMetrics.recordSubmission("POST /events", "duplicate");
             return new SubmitResult(toResponse(duplicate), false);
         }
@@ -93,6 +97,22 @@ public class EventService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private void validateDuplicateMatches(EventEntity existing, EventRequest request) {
+        if (!matchesRequest(existing, request)) {
+            throw new EventConflictException(
+                    "eventId already exists with different event details: " + request.eventId()
+            );
+        }
+    }
+
+    private boolean matchesRequest(EventEntity existing, EventRequest request) {
+        return Objects.equals(existing.getAccountId(), request.accountId())
+                && existing.getType() == request.type()
+                && existing.getAmount().compareTo(request.amount()) == 0
+                && Objects.equals(existing.getCurrency(), request.currency())
+                && Objects.equals(existing.getEventTimestamp(), request.eventTimestamp());
     }
 
     private EventEntity findEvent(String id) {
