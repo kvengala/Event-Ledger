@@ -3,9 +3,11 @@ package com.eventledger.gateway.client;
 import com.eventledger.gateway.domain.TransactionType;
 import com.eventledger.gateway.dto.AccountTransactionRequest;
 import com.eventledger.gateway.exception.AccountServiceUnavailableException;
+import com.eventledger.gateway.tracing.TraceContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -15,6 +17,7 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -54,6 +57,22 @@ class AccountServiceClientTest {
 
         assertThatThrownBy(() -> client.applyTransaction("acct-123", sampleRequest()))
                 .isInstanceOf(AccountServiceUnavailableException.class);
+    }
+
+    @Test
+    void applyTransactionPropagatesTraceIdHeader() {
+        MDC.put(TraceContext.MDC_TRACE_ID, "trace-abc-123");
+        try {
+            server.expect(requestTo("http://localhost:8081/accounts/acct-123/transactions"))
+                    .andExpect(method(HttpMethod.POST))
+                    .andExpect(header(TraceContext.TRACE_HEADER, "trace-abc-123"))
+                    .andRespond(withSuccess());
+
+            assertThatCode(() -> client.applyTransaction("acct-123", sampleRequest()))
+                    .doesNotThrowAnyException();
+        } finally {
+            MDC.remove(TraceContext.MDC_TRACE_ID);
+        }
     }
 
     private AccountTransactionRequest sampleRequest() {

@@ -4,6 +4,7 @@ import com.eventledger.gateway.domain.TransactionType;
 import com.eventledger.gateway.dto.EventRequest;
 import com.eventledger.gateway.dto.EventResponse;
 import com.eventledger.gateway.exception.GlobalExceptionHandler;
+import com.eventledger.gateway.metrics.EventMetrics;
 import com.eventledger.gateway.service.EventService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -39,13 +40,16 @@ class EventControllerTest {
     @Mock
     private EventService eventService;
 
+    @Mock
+    private EventMetrics eventMetrics;
+
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new EventController(eventService))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(eventMetrics))
                 .setValidator(validator)
                 .build();
     }

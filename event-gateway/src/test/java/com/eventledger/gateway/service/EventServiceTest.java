@@ -6,6 +6,7 @@ import com.eventledger.gateway.domain.TransactionType;
 import com.eventledger.gateway.dto.EventRequest;
 import com.eventledger.gateway.dto.EventResponse;
 import com.eventledger.gateway.exception.AccountServiceUnavailableException;
+import com.eventledger.gateway.metrics.EventMetrics;
 import com.eventledger.gateway.repository.EventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -39,12 +40,15 @@ class EventServiceTest {
     @Mock
     private AccountServiceClient accountServiceClient;
 
+    @Mock
+    private EventMetrics eventMetrics;
+
     private EventService eventService;
 
     @BeforeEach
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        eventService = new EventService(eventRepository, accountServiceClient, objectMapper);
+        eventService = new EventService(eventRepository, accountServiceClient, objectMapper, eventMetrics);
     }
 
     @Test

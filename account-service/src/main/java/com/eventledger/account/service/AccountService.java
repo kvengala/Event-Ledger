@@ -8,6 +8,8 @@ import com.eventledger.account.dto.TransactionRequest;
 import com.eventledger.account.dto.TransactionResponse;
 import com.eventledger.account.repository.AccountRepository;
 import com.eventledger.account.repository.TransactionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,8 @@ import java.util.List;
 
 @Service
 public class AccountService {
+
+    private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
@@ -45,6 +49,7 @@ public class AccountService {
                 Instant.now()
         ));
 
+        log.info("Applied transaction {} to account {}", request.eventId(), accountId);
         return new TransactionResult(toResponse(transaction), true);
     }
 

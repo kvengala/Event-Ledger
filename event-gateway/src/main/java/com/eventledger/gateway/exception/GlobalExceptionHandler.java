@@ -1,6 +1,7 @@
 package com.eventledger.gateway.exception;
 
 import com.eventledger.gateway.dto.ErrorResponse;
+import com.eventledger.gateway.metrics.EventMetrics;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -14,6 +15,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private final EventMetrics eventMetrics;
+
+    public GlobalExceptionHandler(EventMetrics eventMetrics) {
+        this.eventMetrics = eventMetrics;
+    }
+
     @ExceptionHandler(EventNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(EventNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -22,6 +29,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccountServiceUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleAccountServiceUnavailable(AccountServiceUnavailableException ex) {
+        eventMetrics.recordSubmission("POST /events", "unavailable");
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(ErrorResponse.of(503, "Service Unavailable", ex.getMessage()));
     }

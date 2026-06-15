@@ -2,8 +2,10 @@ package com.eventledger.gateway.client;
 
 import com.eventledger.gateway.dto.AccountTransactionRequest;
 import com.eventledger.gateway.exception.AccountServiceUnavailableException;
+import com.eventledger.gateway.tracing.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -21,9 +23,15 @@ public class AccountServiceClient {
 
     public void applyTransaction(String accountId, AccountTransactionRequest request) {
         try {
-            accountRestClient.post()
-                    .uri("/accounts/{accountId}/transactions", accountId)
-                    .body(request)
+            var requestSpec = accountRestClient.post()
+                    .uri("/accounts/{accountId}/transactions", accountId);
+
+            String traceId = MDC.get(TraceContext.MDC_TRACE_ID);
+            if (traceId != null && !traceId.isBlank()) {
+                requestSpec = requestSpec.header(TraceContext.TRACE_HEADER, traceId);
+            }
+
+            requestSpec.body(request)
                     .retrieve()
                     .toBodilessEntity();
             log.info("Applied transaction {} to account {}", request.eventId(), accountId);

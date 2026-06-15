@@ -6,6 +6,7 @@ import com.eventledger.gateway.dto.AccountTransactionRequest;
 import com.eventledger.gateway.dto.EventRequest;
 import com.eventledger.gateway.dto.EventResponse;
 import com.eventledger.gateway.exception.EventNotFoundException;
+import com.eventledger.gateway.metrics.EventMetrics;
 import com.eventledger.gateway.repository.EventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,21 +24,25 @@ public class EventService {
     private final EventRepository eventRepository;
     private final AccountServiceClient accountServiceClient;
     private final ObjectMapper objectMapper;
+    private final EventMetrics eventMetrics;
 
     public EventService(
             EventRepository eventRepository,
             AccountServiceClient accountServiceClient,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            EventMetrics eventMetrics
     ) {
         this.eventRepository = eventRepository;
         this.accountServiceClient = accountServiceClient;
         this.objectMapper = objectMapper;
+        this.eventMetrics = eventMetrics;
     }
 
     @Transactional
     public SubmitResult submitEvent(EventRequest request) {
         var existing = eventRepository.findByEventId(request.eventId());
         if (existing.isPresent()) {
+            eventMetrics.recordSubmission("POST /events", "duplicate");
             return new SubmitResult(toResponse(existing.get()), false);
         }
 
@@ -63,6 +68,7 @@ public class EventService {
                 Instant.now()
         ));
 
+        eventMetrics.recordSubmission("POST /events", "created");
         return new SubmitResult(toResponse(saved), true);
     }
 
