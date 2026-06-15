@@ -14,6 +14,10 @@ RUN mvn -B -pl event-gateway -am package -Dmaven.test.skip=true
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/event-gateway/target/event-gateway-*.jar app.jar
 
 ENV SERVER_PORT=8080

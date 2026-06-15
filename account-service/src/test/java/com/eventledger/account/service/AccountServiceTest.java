@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @Import(AccountService.class)
@@ -43,6 +44,21 @@ class AccountServiceTest {
         var second = accountService.applyTransaction("acct-2", request("evt-dup", TransactionType.CREDIT, "25.00", "2026-05-15T14:00:00Z"));
 
         assertThat(second.created()).isFalse();
+        assertThat(transactionRepository.findAll()).hasSize(1);
+        assertThat(accountService.getBalance("acct-2").balance()).isEqualByComparingTo(new BigDecimal("25.00"));
+    }
+
+    @Test
+    void duplicateEventIdWithDifferentDetailsIsRejected() {
+        apply("acct-2", "evt-dup-mismatch", TransactionType.CREDIT, "25.00", "2026-05-15T14:00:00Z");
+
+        assertThatThrownBy(() -> accountService.applyTransaction(
+                "acct-2",
+                request("evt-dup-mismatch", TransactionType.DEBIT, "25.00", "2026-05-15T14:00:00Z")
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("eventId already exists with different transaction details");
+
         assertThat(transactionRepository.findAll()).hasSize(1);
         assertThat(accountService.getBalance("acct-2").balance()).isEqualByComparingTo(new BigDecimal("25.00"));
     }

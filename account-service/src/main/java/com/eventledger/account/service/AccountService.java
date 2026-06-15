@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class AccountService {
@@ -33,7 +34,13 @@ public class AccountService {
     public TransactionResult applyTransaction(String accountId, TransactionRequest request) {
         var existing = transactionRepository.findByEventId(request.eventId());
         if (existing.isPresent()) {
-            return new TransactionResult(toResponse(existing.get()), false);
+            Transaction transaction = existing.get();
+            if (!matchesRequest(transaction, accountId, request)) {
+                throw new IllegalArgumentException(
+                        "eventId already exists with different transaction details: " + request.eventId()
+                );
+            }
+            return new TransactionResult(toResponse(transaction), false);
         }
 
         accountRepository.findById(accountId)
@@ -51,6 +58,14 @@ public class AccountService {
 
         log.info("Applied transaction {} to account {}", request.eventId(), accountId);
         return new TransactionResult(toResponse(transaction), true);
+    }
+
+    private boolean matchesRequest(Transaction transaction, String accountId, TransactionRequest request) {
+        return Objects.equals(transaction.getAccountId(), accountId)
+                && transaction.getType() == request.type()
+                && transaction.getAmount().compareTo(request.amount()) == 0
+                && Objects.equals(transaction.getCurrency(), request.currency())
+                && Objects.equals(transaction.getEventTimestamp(), request.eventTimestamp());
     }
 
     @Transactional(readOnly = true)

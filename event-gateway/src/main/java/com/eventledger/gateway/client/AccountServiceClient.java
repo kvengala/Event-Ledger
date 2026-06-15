@@ -2,12 +2,14 @@ package com.eventledger.gateway.client;
 
 import com.eventledger.gateway.dto.AccountTransactionRequest;
 import com.eventledger.gateway.exception.AccountServiceUnavailableException;
+import com.eventledger.gateway.exception.EventConflictException;
 import com.eventledger.gateway.tracing.TraceContext;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -47,9 +49,16 @@ public class AccountServiceClient {
             requestSpec = requestSpec.header(TraceContext.TRACE_HEADER, traceId);
         }
 
-        requestSpec.body(request)
-                .retrieve()
-                .toBodilessEntity();
+        try {
+            requestSpec.body(request)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException.Conflict ex) {
+            throw new EventConflictException(
+                    "eventId already exists with different transaction details: " + request.eventId(),
+                    ex
+            );
+        }
         log.info("Applied transaction {} to account {}", request.eventId(), accountId);
     }
 }

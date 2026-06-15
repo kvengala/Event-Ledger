@@ -11,6 +11,7 @@ import com.eventledger.gateway.repository.EventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,16 +58,24 @@ public class EventService {
                 )
         );
 
-        EventEntity saved = eventRepository.save(new EventEntity(
-                request.eventId(),
-                request.accountId(),
-                request.type(),
-                request.amount(),
-                request.currency(),
-                request.eventTimestamp(),
-                serializeMetadata(request.metadata()),
-                Instant.now()
-        ));
+        EventEntity saved;
+        try {
+            saved = eventRepository.saveAndFlush(new EventEntity(
+                    request.eventId(),
+                    request.accountId(),
+                    request.type(),
+                    request.amount(),
+                    request.currency(),
+                    request.eventTimestamp(),
+                    serializeMetadata(request.metadata()),
+                    Instant.now()
+            ));
+        } catch (DataIntegrityViolationException ex) {
+            EventEntity duplicate = eventRepository.findByEventId(request.eventId())
+                    .orElseThrow(() -> ex);
+            eventMetrics.recordSubmission("POST /events", "duplicate");
+            return new SubmitResult(toResponse(duplicate), false);
+        }
 
         eventMetrics.recordSubmission("POST /events", "created");
         return new SubmitResult(toResponse(saved), true);

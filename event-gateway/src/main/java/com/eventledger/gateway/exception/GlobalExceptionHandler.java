@@ -34,6 +34,12 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(503, "Service Unavailable", ex.getMessage()));
     }
 
+    @ExceptionHandler(EventConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(EventConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.of(409, "Conflict", ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();

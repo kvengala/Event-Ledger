@@ -1,6 +1,7 @@
 package com.eventledger.gateway.controller;
 
 import com.eventledger.gateway.exception.AccountServiceUnavailableException;
+import com.eventledger.gateway.exception.EventConflictException;
 import com.eventledger.gateway.exception.GlobalExceptionHandler;
 import com.eventledger.gateway.metrics.EventMetrics;
 import com.eventledger.gateway.service.EventService;
@@ -60,5 +61,26 @@ class EventControllerErrorTest {
                                 """))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.status").value(503));
+    }
+
+    @Test
+    void returns409WhenDuplicateEventPayloadConflicts() throws Exception {
+        doThrow(new EventConflictException("eventId already exists with different transaction details: evt-409", null))
+                .when(eventService).submitEvent(any());
+
+        mockMvc.perform(post("/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "eventId": "evt-409",
+                                  "accountId": "acct-123",
+                                  "type": "CREDIT",
+                                  "amount": 10.00,
+                                  "currency": "USD",
+                                  "eventTimestamp": "2026-05-15T14:02:11Z"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
     }
 }

@@ -33,10 +33,6 @@ resilience4j:
           - org.springframework.web.client.HttpServerErrorException
         ignoreExceptions:
           - org.springframework.web.client.HttpClientErrorException
-  timelimiter:
-    instances:
-      accountService:
-        timeoutDuration: 2s
 
 management:
   endpoints:

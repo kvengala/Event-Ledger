@@ -2,6 +2,7 @@ package com.eventledger.gateway.client;
 
 import com.eventledger.gateway.domain.TransactionType;
 import com.eventledger.gateway.dto.AccountTransactionRequest;
+import com.eventledger.gateway.exception.EventConflictException;
 import com.eventledger.gateway.tracing.TraceContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,8 +21,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import org.springframework.http.HttpStatus;
 
 class AccountServiceClientTest {
 
@@ -57,6 +60,16 @@ class AccountServiceClientTest {
 
         assertThatThrownBy(() -> client.applyTransaction("acct-123", sampleRequest()))
                 .isInstanceOf(HttpServerErrorException.class);
+    }
+
+    @Test
+    void applyTransactionTranslatesDuplicateMismatchConflict() {
+        server.expect(requestTo("http://localhost:8081/accounts/acct-123/transactions"))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThatThrownBy(() -> client.applyTransaction("acct-123", sampleRequest()))
+                .isInstanceOf(EventConflictException.class)
+                .hasMessageContaining("eventId already exists with different transaction details");
     }
 
     @Test
