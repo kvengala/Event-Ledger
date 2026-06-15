@@ -1,0 +1,97 @@
+package com.eventledger.account.service;
+
+import com.eventledger.account.domain.Account;
+import com.eventledger.account.domain.Transaction;
+import com.eventledger.account.dto.AccountResponse;
+import com.eventledger.account.dto.BalanceResponse;
+import com.eventledger.account.dto.TransactionRequest;
+import com.eventledger.account.dto.TransactionResponse;
+import com.eventledger.account.repository.AccountRepository;
+import com.eventledger.account.repository.TransactionRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+
+@Service
+public class AccountService {
+
+    private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
+
+    public AccountService(AccountRepository accountRepository, TransactionRepository transactionRepository) {
+        this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
+    }
+
+    @Transactional
+    public TransactionResult applyTransaction(String accountId, TransactionRequest request) {
+        var existing = transactionRepository.findByEventId(request.eventId());
+        if (existing.isPresent()) {
+            return new TransactionResult(toResponse(existing.get()), false);
+        }
+
+        accountRepository.findById(accountId)
+                .orElseGet(() -> accountRepository.save(new Account(accountId, request.currency(), Instant.now())));
+
+        Transaction transaction = transactionRepository.save(new Transaction(
+                request.eventId(),
+                accountId,
+                request.type(),
+                request.amount(),
+                request.currency(),
+                request.eventTimestamp(),
+                Instant.now()
+        ));
+
+        return new TransactionResult(toResponse(transaction), true);
+    }
+
+    @Transactional(readOnly = true)
+    public BalanceResponse getBalance(String accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+
+        return new BalanceResponse(
+                accountId,
+                transactionRepository.calculateBalance(accountId),
+                account.getCurrency()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public AccountResponse getAccount(String accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+
+        List<TransactionResponse> transactions = transactionRepository
+                .findByAccountIdOrderByEventTimestampDesc(accountId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+        return new AccountResponse(
+                accountId,
+                transactionRepository.calculateBalance(accountId),
+                account.getCurrency(),
+                account.getCreatedAt(),
+                transactions
+        );
+    }
+
+    private TransactionResponse toResponse(Transaction transaction) {
+        return new TransactionResponse(
+                transaction.getEventId(),
+                transaction.getAccountId(),
+                transaction.getType(),
+                transaction.getAmount(),
+                transaction.getCurrency(),
+                transaction.getEventTimestamp(),
+                transaction.getAppliedAt()
+        );
+    }
+
+    public record TransactionResult(TransactionResponse transaction, boolean created) {
+    }
+}
