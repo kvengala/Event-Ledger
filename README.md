@@ -223,25 +223,4 @@ event-ledger/
 
 ## Troubleshooting
 
-### Git push: `Permission denied to jtguser01`
 
-Windows may be using cached GitHub credentials for the wrong account. Fix:
-
-```powershell
-cmdkey /delete:git:https://github.com
-git remote set-url origin https://kvengala@github.com/kvengala/Event-Ledger.git
-git push origin main
-```
-
-When prompted, sign in as **kvengala** (GitHub username), not another account.
-
-### Docker: port 8080 already in use
-
-Stop any local process on port 8080 (e.g. a running `mvn spring-boot:run` for the gateway), then:
-
-```bash
-docker compose down
-docker compose up --build
-```
-
-Alternatively, change the host port mapping in `docker-compose.yml` (e.g. `"18080:8080"`).
