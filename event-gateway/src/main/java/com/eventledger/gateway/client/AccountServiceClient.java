@@ -3,12 +3,12 @@ package com.eventledger.gateway.client;
 import com.eventledger.gateway.dto.AccountTransactionRequest;
 import com.eventledger.gateway.exception.AccountServiceUnavailableException;
 import com.eventledger.gateway.tracing.TraceContext;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 @Component
 public class AccountServiceClient {
@@ -21,25 +21,35 @@ public class AccountServiceClient {
         this.accountRestClient = accountRestClient;
     }
 
+    @Retry(name = "accountService", fallbackMethod = "applyTransactionFallback")
     public void applyTransaction(String accountId, AccountTransactionRequest request) {
-        try {
-            var requestSpec = accountRestClient.post()
-                    .uri("/accounts/{accountId}/transactions", accountId);
+        executeApplyTransaction(accountId, request);
+    }
 
-            String traceId = MDC.get(TraceContext.MDC_TRACE_ID);
-            if (traceId != null && !traceId.isBlank()) {
-                requestSpec = requestSpec.header(TraceContext.TRACE_HEADER, traceId);
-            }
+    @SuppressWarnings("unused")
+    private void applyTransactionFallback(
+            String accountId,
+            AccountTransactionRequest request,
+            Exception ex
+    ) {
+        throw new AccountServiceUnavailableException(
+                "Account Service is unavailable while applying transaction " + request.eventId(),
+                ex
+        );
+    }
 
-            requestSpec.body(request)
-                    .retrieve()
-                    .toBodilessEntity();
-            log.info("Applied transaction {} to account {}", request.eventId(), accountId);
-        } catch (RestClientException ex) {
-            throw new AccountServiceUnavailableException(
-                    "Account Service is unavailable while applying transaction " + request.eventId(),
-                    ex
-            );
+    private void executeApplyTransaction(String accountId, AccountTransactionRequest request) {
+        var requestSpec = accountRestClient.post()
+                .uri("/accounts/{accountId}/transactions", accountId);
+
+        String traceId = MDC.get(TraceContext.MDC_TRACE_ID);
+        if (traceId != null && !traceId.isBlank()) {
+            requestSpec = requestSpec.header(TraceContext.TRACE_HEADER, traceId);
         }
+
+        requestSpec.body(request)
+                .retrieve()
+                .toBodilessEntity();
+        log.info("Applied transaction {} to account {}", request.eventId(), accountId);
     }
 }

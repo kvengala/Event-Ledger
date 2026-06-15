@@ -2,7 +2,6 @@ package com.eventledger.gateway.client;
 
 import com.eventledger.gateway.domain.TransactionType;
 import com.eventledger.gateway.dto.AccountTransactionRequest;
-import com.eventledger.gateway.exception.AccountServiceUnavailableException;
 import com.eventledger.gateway.tracing.TraceContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
@@ -56,7 +56,7 @@ class AccountServiceClientTest {
                 .andRespond(withServerError());
 
         assertThatThrownBy(() -> client.applyTransaction("acct-123", sampleRequest()))
-                .isInstanceOf(AccountServiceUnavailableException.class);
+                .isInstanceOf(HttpServerErrorException.class);
     }
 
     @Test

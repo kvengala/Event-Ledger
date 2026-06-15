@@ -1,0 +1,17 @@
+resilience4j:
+  retry:
+    instances:
+      accountService:
+        maxAttempts: 3
+        waitDuration: 50ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+  timelimiter:
+    instances:
+      accountService:
+        timeoutDuration: 2s
